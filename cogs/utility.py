@@ -3,7 +3,6 @@ import discord
 from discord.ext import commands
 import random
 import asyncio
-import yt_dlp
 from pydub import AudioSegment
 
 
@@ -12,12 +11,12 @@ class Utility(commands.Cog, name="Utility"):
 
     def __init__(self, bot):
         self.bot = bot
+        self.active_timers = {}  # Dictionary to keep track of active timers
 
     @commands.command(name="roll")
     async def roll(self, ctx, words: str):
         """Rolls a dice, .roll [number]d[sides]."""
         stripped_words = words.replace(" ", "")
-        print(stripped_words)
         if "d" in stripped_words:
             amount = 1
             sides = 1
@@ -51,12 +50,9 @@ class Utility(commands.Cog, name="Utility"):
 
         finalRoll = Utility.rollDice(self, amount, sides)
         finalString = (
-            f"You rolled {amount} {sides}-sided dice."
-            + "\n"
-            + "Your rolls are: "
+            f"You rolled {amount} {sides}-sided dice.\nYour rolls are: "
             + ", ".join(finalRoll)
         )
-
         await ctx.send(finalString)
 
     def rollDice(self, amount, sides):
@@ -66,8 +62,10 @@ class Utility(commands.Cog, name="Utility"):
         return rolls
 
     @commands.command(name="timer")
-    async def timer(self, ctx, words: str):
-        """Set a timer for hh:mm:ss or ss."""
+    async def timer(
+        self, ctx, words: str, *, description: str = "No description provided."
+    ):
+        """Set a timer for hh:mm:ss or ss with an optional description."""
         await ctx.message.delete()
         split_words = words.split(":")
         hours, minutes, seconds = 0, 0, 0
@@ -91,35 +89,70 @@ class Utility(commands.Cog, name="Utility"):
             await ctx.send("Please set a positive duration for the timer.")
             return
 
+        timer_id = len(self.active_timers) + 1  # Unique ID for the timer
+        self.active_timers[timer_id] = {
+            "description": description,
+            "remaining_time": total_seconds,
+            "user": ctx.author,
+        }
+
         await ctx.send(
-            f"{ctx.author.mention}, timer set for {hours}h {minutes}m {seconds}s!"
+            f"{ctx.author.mention}, timer set for {hours}h {minutes}m {seconds}s! Description: {description}"
         )
-        await asyncio.sleep(total_seconds)
 
-        if ctx.author.voice and ctx.author.voice.channel:
-            try:
-                voice_channel = ctx.author.voice.channel
+        while self.active_timers.get(timer_id):
+            if total_seconds <= 0:
+                break
+            await asyncio.sleep(1)
+            total_seconds -= 1
+            self.active_timers[timer_id]["remaining_time"] = total_seconds
 
-                audio_file = "./sounds/alert.mp3"
-                sound = AudioSegment.from_file(audio_file)
-                audio_duration = sound.duration_seconds
+        if timer_id in self.active_timers:
+            if (
+                ctx.author.voice
+                and ctx.author.voice.channel
+                and not ctx.guild.voice_client
+            ):
+                try:
+                    voice_channel = ctx.author.voice.channel
+                    audio_file = "./sounds/alert.mp3"
+                    sound = AudioSegment.from_file(audio_file)
+                    audio_duration = sound.duration_seconds
 
-                vc = await voice_channel.connect()
-                vc.play(discord.FFmpegPCMAudio(audio_file))
+                    vc = await voice_channel.connect()
+                    vc.play(discord.FFmpegPCMAudio(audio_file))
 
+                    await ctx.send(
+                        f"{ctx.author.mention}, time's up! {self.active_timers[timer_id]['description']}"
+                    )
+                    await asyncio.sleep(audio_duration)
+                    await vc.disconnect()
+                except Exception as e:
+                    print(f"An error occurred: {e}")
+            else:
                 await ctx.send(
-                    f"{ctx.author.mention}, time's up! {hours}h {minutes}m {seconds}s have passed."
+                    f"{ctx.author.mention}, time's up! {self.active_timers[timer_id]['description']}"
                 )
 
-                await asyncio.sleep(audio_duration)
-                await vc.disconnect()
-            except Exception as e:
-                print(f"An error occured: {e}")
-                # await ctx.send(f"An error occured: {e}")
-        else:
-            await ctx.send(
-                f"{ctx.author.mention}, time's up! {hours}h {minutes}m {seconds}s have passed."
+            del self.active_timers[timer_id]  # Remove the timer after it has finished
+
+    @commands.command(name="timers")
+    async def timers(self, ctx):
+        """List all active timers."""
+        if not self.active_timers:
+            await ctx.send("No active timers.")
+            return
+
+        timer_list = []
+        for timer_id, timer_info in self.active_timers.items():
+            remaining_time = timer_info["remaining_time"]
+            hours, remainder = divmod(remaining_time, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            timer_list.append(
+                f"**Timer {timer_id}**: {timer_info['description']} - {hours}h {minutes}m {seconds}s remaining."
             )
+
+        await ctx.send("\n".join(timer_list))
 
     @commands.command(name="play")
     async def play(self, ctx):
@@ -142,7 +175,6 @@ class Utility(commands.Cog, name="Utility"):
                     await attachment.save(audio_file)
 
                     if ctx.author.voice and ctx.author.voice.channel:
-                        print("bruh")
                         voice_channel = ctx.author.voice.channel
                         vc = await voice_channel.connect()
 
