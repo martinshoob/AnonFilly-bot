@@ -25,6 +25,7 @@ async def load_cogs():
     await bot.load_extension("cogs.management")
     await bot.load_extension("cogs.fun")
     await bot.load_extension("cogs.utility")
+    await bot.load_extension("cogs.audio_player")
 
 
 async def main():
