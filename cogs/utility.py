@@ -39,7 +39,7 @@ class Utility(commands.Cog, name="Utility"):
                     return
         else:
             await ctx.send(
-                "Wrong format, did you write [number]d[sides]?", delete_after=5
+            "Wrong format, did you write [number]d[sides]?", delete_after=5
             )
             return
 
