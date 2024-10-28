@@ -1,7 +1,9 @@
+import os
 import discord
 from discord.ext import commands
 import random
 import asyncio
+import yt_dlp
 from pydub import AudioSegment
 
 
@@ -39,7 +41,7 @@ class Utility(commands.Cog, name="Utility"):
                     return
         else:
             await ctx.send(
-            "Wrong format, did you write [number]d[sides]?", delete_after=5
+                "Wrong format, did you write [number]d[sides]?", delete_after=5
             )
             return
 
@@ -118,6 +120,136 @@ class Utility(commands.Cog, name="Utility"):
             await ctx.send(
                 f"{ctx.author.mention}, time's up! {hours}h {minutes}m {seconds}s have passed."
             )
+
+    @commands.command(name="play")
+    async def play(self, ctx):
+        """Play an MP3 file uploaded with the command."""
+        await ctx.send(f"{ctx.author.mention}, please upload an mp3 file.")
+
+        def check(msg):
+            return (
+                msg.author == ctx.author
+                and msg.channel == ctx.channel
+                and msg.attachments
+            )
+
+        try:
+            msg = await self.bot.wait_for("message", timeout=60.0, check=check)
+
+            for attachment in msg.attachments:
+                if attachment.filename.endswith(".mp3"):
+                    audio_file = f"./sounds/{attachment.filename}"
+                    await attachment.save(audio_file)
+
+                    if ctx.author.voice and ctx.author.voice.channel:
+                        print("bruh")
+                        voice_channel = ctx.author.voice.channel
+                        vc = await voice_channel.connect()
+
+                        sound = AudioSegment.from_file(audio_file)
+                        audio_duration = sound.duration_seconds
+
+                        vc.play(discord.FFmpegPCMAudio(audio_file))
+                        await asyncio.sleep(audio_duration)
+
+                        await vc.disconnect()
+
+                        os.remove(audio_file)
+                    else:
+                        await ctx.send("You need to be in a VC to play audio.")
+                    return
+
+            await ctx.send("Please upload a valid .mp3 file.")
+        except asyncio.TimeoutError:
+            await ctx.send("You took too long! Please try again.")
+
+    @commands.command(name="ytplay")
+    async def ytplay(self, ctx, url: str):
+        """Download and play audio from a YouTube URL in MP3 format with a dynamic filename in ./sounds directory."""
+
+        # Ensure user is in a voice channel
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            await ctx.send("You need to be in a voice channel to play audio.")
+            return
+
+        voice_channel = ctx.author.voice.channel
+
+        # Set output directory and ensure it exists
+        output_dir = "./sounds"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Use yt-dlp to extract video metadata and generate a dynamic filename
+        ydl_opts_info = {"format": "bestaudio/best", "quiet": True}
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                video_title = info_dict.get("title", "downloaded_audio").replace(
+                    " ", "_"
+                )
+                temp_file_name = f"{video_title}.mp3"  # Initial filename for download
+                file_path = os.path.join(output_dir, temp_file_name)
+        except Exception as e:
+            await ctx.send(f"An error occurred while fetching video info: {e}")
+            return
+
+        # Define yt-dlp download options with a specified filename in ./sounds
+        ydl_opts_download = {
+            "format": "bestaudio/best",
+            "outtmpl": file_path,  # Output path in ./sounds
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ],
+        }
+
+        # Download audio using yt-dlp
+        await ctx.send(f"Downloading **{video_title}**... This may take a moment.")
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts_download) as ydl:
+                ydl.download([url])
+            await ctx.send("Audio downloaded successfully.")
+
+            # Check if the file has an extra .mp3 extension and rename if necessary
+            if not os.path.exists(file_path) and os.path.exists(file_path + ".mp3"):
+                os.rename(file_path + ".mp3", file_path)
+
+        except Exception as e:
+            await ctx.send(f"An error occurred while downloading: {e}")
+            return
+
+        # Connect to the voice channel and play the audio
+        try:
+            # Connect to the voice channel
+            if ctx.guild.voice_client is None:
+                vc = await voice_channel.connect()
+                await ctx.send("Bot joined the voice channel.")
+            else:
+                vc = ctx.guild.voice_client
+
+            # Play the downloaded audio
+            vc.play(
+                discord.FFmpegPCMAudio(file_path),
+                after=lambda e: print("Playback finished."),
+            )
+
+            # Wait until audio is done playing
+            while vc.is_playing():
+                await asyncio.sleep(1)
+
+            # Disconnect and clean up
+            await vc.disconnect()
+            os.remove(file_path)
+            await ctx.send(
+                f"Playback finished for **{video_title}**. Bot has left the voice channel."
+            )
+
+        except discord.DiscordException as e:
+            await ctx.send(f"An error occurred during playback: {e}")
 
 
 # Add this cog to the bot
