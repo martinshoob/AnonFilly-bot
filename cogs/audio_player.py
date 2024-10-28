@@ -34,17 +34,26 @@ class AudioPlayer(commands.Cog):
                 ),
             )
             self.is_playing = True
+            while self.vc.is_playing():
+                await asyncio.sleep(1)
+
+            os.remove(next_song)
         else:
             self.is_playing = False  # Queue is empty, stop playing
 
     async def on_song_end(self):
         """Callback when a song ends; plays the next song if available."""
         await asyncio.sleep(1)  # Delay to ensure current song cleanup
-        if not self.queue:
-            await self.vc.disconnect()  # Disconnect if the queue is empty
-            self.vc = None
-        else:
+        if self.queue:
             await self.play_next_in_queue()
+        else:
+            await self.cleanup()  # Cleanup if the queue is empty
+
+    async def cleanup(self):
+        """Disconnect from the voice channel and delete the audio files."""
+        if self.vc:
+            await self.vc.disconnect()  # Disconnect from the voice channel
+            self.vc = None
 
     @commands.command(name="ytplay")
     async def ytplay(self, ctx, url: str):
@@ -114,7 +123,7 @@ class AudioPlayer(commands.Cog):
         if self.queue:
             queue_list = "\n".join(
                 [
-                    f"{i+1}. {os.path.basename(song)}"
+                    f"{i + 1}. {os.path.basename(song)}"
                     for i, song in enumerate(self.queue)
                 ]
             )
@@ -126,17 +135,27 @@ class AudioPlayer(commands.Cog):
     async def stop(self, ctx):
         """Stop playback and clear the queue."""
         if self.vc:
+            if self.queue:
+                for song in self.queue:
+                    try:
+                        os.remove(song)  # Remove each song in the queue
+                    except FileNotFoundError:
+                        pass  # Ignore if the file was already deleted
             self.queue.clear()  # Clear the queue
             self.vc.stop()  # Stop any currently playing song
             self.is_playing = False
             await ctx.send("Playback stopped, and the queue has been cleared.")
-            await self.vc.disconnect()  # Disconnect from the voice channel
-            self.vc = None
+            await self.cleanup()  # Cleanup
 
     @commands.command(name="clearqueue")
     async def clearqueue(self, ctx):
         """Clear the current queue without stopping playback."""
         if self.queue:
+            for song in self.queue:
+                try:
+                    os.remove(song)  # Remove each song in the queue
+                except FileNotFoundError:
+                    pass  # Ignore if the file was already deleted
             self.queue.clear()
             await ctx.send("Queue has been cleared.")
         else:
@@ -164,4 +183,3 @@ class AudioPlayer(commands.Cog):
 # Add this cog to the bot
 async def setup(bot):
     await bot.add_cog(AudioPlayer(bot))
-
