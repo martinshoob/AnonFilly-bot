@@ -142,7 +142,26 @@ class AudioPlayer(commands.Cog):
         else:
             await ctx.send("The queue is already empty.")
 
+    @commands.command(name="pause")
+    async def pause(self, ctx):
+        """Pause the currently playing song."""
+        if self.vc and self.vc.is_playing():
+            self.vc.pause()
+            await ctx.send("Playback paused.")
+        else:
+            await ctx.send("There is no audio currently playing to pause.")
+
+    @commands.command(name="resume")
+    async def resume(self, ctx):
+        """Resume the currently paused song."""
+        if self.vc and self.vc.is_paused():
+            self.vc.resume()
+            await ctx.send("Playback resumed.")
+        else:
+            await ctx.send("There is no audio currently paused to resume.")
+
 
 # Add this cog to the bot
 async def setup(bot):
     await bot.add_cog(AudioPlayer(bot))
+
