@@ -19,6 +19,7 @@ bot = commands.Bot(command_prefix=".", intents=intents)
 @bot.event
 async def on_ready():
     print(f"{bot.user} is ready!")
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="REEEEEEEEEEE"))
 
 
 async def load_cogs():
