@@ -103,7 +103,7 @@ class Fun(commands.Cog, name="Fun"):
         else:
             correct_tags = "safe, " + tags
 
-        await ctx.send("Tags: " + correct_tags)
+        await ctx.send("**Tags: **" + correct_tags)
         if "explicit" in correct_tags:
             await ctx.send("Caution! Explicit image.")
             await ctx.send(self.fetch_random_derpibooru_image(correct_tags, "56027"))
@@ -138,11 +138,10 @@ class Fun(commands.Cog, name="Fun"):
                 image_url = image["representations"]["full"]
                 return image_url
             else:
-                print("No images found for the specified tags.")
-                return None
+                return "**No images found for the specified tags.**"
         else:
             print("Error:", response.status_code)
-            return None
+            return "**Error occured, check the logs.**"
 
 
 # Add this cog to the bot
