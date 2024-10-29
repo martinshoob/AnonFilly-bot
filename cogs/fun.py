@@ -1,7 +1,10 @@
 import discord
+from discord.app_commands import command
 from discord.ext import commands
 import random
 import os
+from discord.ext.commands.context import DeferTyping
+import requests
 
 
 class Fun(commands.Cog, name="Fun"):
@@ -85,6 +88,61 @@ class Fun(commands.Cog, name="Fun"):
                 if int(id_) == user_id:
                     quotes.append(quote)
         return quotes
+
+    @commands.command(name="filly")
+    async def filly(self, ctx):
+        """Filly."""
+        await ctx.send(self.fetch_random_derpibooru_image("oc:anonfilly, safe"))
+
+    @commands.command(name="derpi")
+    async def derpi(self, ctx, *, tags: str):
+        """Get a random derpi image with your tags. (seperated by commas)"""
+        correct_tags = tags
+        if ctx.channel.is_nsfw():
+            await ctx.send('Channel is NSFW, "safe" tag not enforced.')
+        else:
+            correct_tags = "safe, " + tags
+
+        await ctx.send("Tags: " + correct_tags)
+        if "explicit" in correct_tags:
+            await ctx.send("Caution! Explicit image.")
+            await ctx.send(self.fetch_random_derpibooru_image(correct_tags, "56027"))
+        else:
+            await ctx.send(self.fetch_random_derpibooru_image(correct_tags))
+
+    def fetch_random_derpibooru_image(
+        self, tags, filter_id=None, sf="random", pp="1"
+    ) -> str:
+        # Base URL for the Derpibooru API endpoint
+        base_url = "https://derpibooru.org/api/v1/json/search/images"
+
+        # Parameters for the search
+        params = {
+            "q": tags,  # Tags for search query, e.g., "oc:anonfilly, safe"
+            "sf": sf,  # Sort field, "random" to get a random image
+            "per_page": pp,  # Limit results to 1 image
+        }
+
+        if filter_id is not None:
+            params["filter_id"] = filter_id
+
+        # Send the request to the API
+        response = requests.get(base_url, params=params)
+
+        # Check if the response is successful
+        if response.status_code == 200:
+            data = response.json()
+            # Check if any images were returned
+            if data["images"]:
+                image = data["images"][0]  # Get the first (and only) image
+                image_url = image["representations"]["full"]
+                return image_url
+            else:
+                print("No images found for the specified tags.")
+                return None
+        else:
+            print("Error:", response.status_code)
+            return None
 
 
 # Add this cog to the bot
