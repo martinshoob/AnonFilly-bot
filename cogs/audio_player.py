@@ -36,6 +36,7 @@ class AudioPlayer(commands.Cog):
                     self.on_song_end(ctx=ctx), self.bot.loop
                 ),
             )
+            await ctx.send(f"Playing **{next_song[9:-4]}**.")
             self.is_playing = True
         else:
             self.is_playing = False  # Queue empty, stop playing
