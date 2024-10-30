@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = str(os.getenv("DISCORD_TOKEN"))
 
 # Set up intents
 intents = discord.Intents.default()

@@ -17,9 +17,9 @@ class Utility(commands.Cog, name="Utility"):
     async def roll(self, ctx, words: str):
         """Rolls a dice, .roll [number]d[sides]."""
         stripped_words = words.replace(" ", "")
+        amount = 1
+        sides = 1
         if "d" in stripped_words:
-            amount = 1
-            sides = 1
             split = stripped_words.split("d")
             if split[0] != "":
                 try:
@@ -39,10 +39,13 @@ class Utility(commands.Cog, name="Utility"):
                     )
                     return
         else:
-            await ctx.send(
-                "Wrong format, did you write [number]d[sides]?", delete_after=5
-            )
-            return
+            try:
+                sides = int(words)
+            except ValueError:
+                await ctx.send(
+                    "Wrong format, did you write [number]d[sides]?", delete_after=5
+                )
+                return
 
         if amount > 100 or sides > 1000:
             await ctx.send("Please, try smaller numbers.", delete_after=5)
@@ -57,7 +60,7 @@ class Utility(commands.Cog, name="Utility"):
 
     def rollDice(self, amount, sides):
         rolls = []
-        for i in range(amount):
+        for _ in range(amount):
             rolls.append(str(random.randint(1, sides)))
         return rolls
 

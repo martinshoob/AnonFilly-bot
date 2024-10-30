@@ -18,7 +18,7 @@ class Fun(commands.Cog, name="Fun"):
         open(self.quotes_file_path, "a").close()  # Create the file if it doesn't exist
 
     @commands.command(name="edge")
-    async def edge(self, ctx, user: discord.Member = None):
+    async def edge(self, ctx, user: discord.Member | None = None):
         """Edge."""
         await ctx.message.delete()
         edge_meme_url = "https://app.tradeoffgame.com/images/browsers/edge-icon.png"  # Replace with a real image URL
@@ -32,7 +32,7 @@ class Fun(commands.Cog, name="Fun"):
                 await ctx.send(f"Edged {user.mention}.", delete_after=5)
             except discord.Forbidden:
                 await ctx.send(
-                    f"Could not send the edge meme to {user.mention}. They might have DMs disabled.",
+                    f"Could not edge {user.mention}. They might have DMs disabled.",
                     delete_after=5,
                 )
         else:
@@ -46,7 +46,7 @@ class Fun(commands.Cog, name="Fun"):
         await ctx.send(response)
 
     @commands.command(name="quote")
-    async def quote(self, ctx, user: discord.Member = None, *, quote: str = None):
+    async def quote(self, ctx, user: discord.Member | None = None, *, quote: str | None = None):
         """Store or retrieve a quote."""
         if ctx.message.reference:  # Check if the command is a reply
             message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
@@ -106,13 +106,14 @@ class Fun(commands.Cog, name="Fun"):
         await ctx.send("**Tags: **" + correct_tags)
         if "explicit" in correct_tags:
             await ctx.send("Caution! Explicit image.")
+            # Using the "everything filter", might need to change that later - it can be wild.
             await ctx.send(self.fetch_random_derpibooru_image(correct_tags, "56027"))
         else:
             await ctx.send(self.fetch_random_derpibooru_image(correct_tags))
 
     def fetch_random_derpibooru_image(
         self, tags, filter_id=None, sf="random", pp="1"
-    ) -> str:
+    ) -> str | None:
         # Base URL for the Derpibooru API endpoint
         base_url = "https://derpibooru.org/api/v1/json/search/images"
 
@@ -120,7 +121,7 @@ class Fun(commands.Cog, name="Fun"):
         params = {
             "q": tags,  # Tags for search query, e.g., "oc:anonfilly, safe"
             "sf": sf,  # Sort field, "random" to get a random image
-            "per_page": pp,  # Limit results to 1 image
+            "per_page": pp,  # Limit results to pp images
         }
 
         if filter_id is not None:

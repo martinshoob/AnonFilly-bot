@@ -13,7 +13,7 @@ class Management(commands.Cog, name="Management"):
         """Deletes a specified number of messages in the channel."""
         if ctx.author.guild_permissions.manage_messages:
             deleted = await ctx.channel.purge(limit=amount + 1)
-            response = await ctx.send(
+            await ctx.send(
                 f"Deleted {len(deleted) - 1} messages", delete_after=3
             )
             # Delete the invoking command message
