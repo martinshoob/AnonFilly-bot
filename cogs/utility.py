@@ -57,7 +57,7 @@ class Utility(commands.Cog, name="Utility"):
 
     def rollDice(self, amount, sides):
         rolls = []
-        for i in range(amount):
+        for _ in range(amount):
             rolls.append(str(random.randint(1, sides)))
         return rolls
 
