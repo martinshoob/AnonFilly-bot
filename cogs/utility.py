@@ -64,83 +64,82 @@ class Utility(commands.Cog, name="Utility"):
             rolls.append(str(random.randint(1, sides)))
         return rolls
 
-    @commands.command(name="timer")
-    async def timer(
-        self, ctx, words: str, *, description: str = "No description provided."
-    ):
-        """Set a timer for hh:mm:ss or ss with an optional description."""
-        await ctx.message.delete()
-        split_words = words.split(":")
-        hours, minutes, seconds = 0, 0, 0
-        if len(split_words) == 3:
-            try:
-                hours = int(split_words[0])
-                minutes = int(split_words[1])
-                seconds = int(split_words[2])
-            except ValueError:
-                await ctx.send("Wrong format, did you forget to write numbers?")
-                return
-        else:
-            try:
-                seconds = int(words)
-            except ValueError:
-                await ctx.send("Wrong format, please write hh:mm:ss or ss.")
-                return
+    @commands.group(name="timer", invoke_without_command=True)
+    async def timer(self, ctx):
+        """Base command for timer-related subcommands."""
+        await ctx.send("Use a subcommand like start, stop, clear, extend, or list.")
 
-        total_seconds = hours * 3600 + minutes * 60 + seconds
-        if total_seconds <= 0:
-            await ctx.send("Please set a positive duration for the timer.")
+    @timer.command(name="set")
+    async def set_timer(
+        self, ctx, time_str: str, *, description: str = "No description provided."
+    ):
+        """Set a timer for a specific duration in 'hh:mm:ss' or 'ss' format."""
+        total_seconds = await self.parse_time(ctx, time_str)
+        if total_seconds is None:
+            await ctx.send("Please enter a positive duration for the timer.")
             return
 
-        timer_id = len(self.active_timers) + 1  # Unique ID for the timer
+        timer_id = len(self.active_timers) + 1
         self.active_timers[timer_id] = {
             "description": description,
             "remaining_time": total_seconds,
             "user": ctx.author,
         }
 
+        hours, minutes, seconds = (
+            total_seconds // 3600,
+            (total_seconds % 3600) // 60,
+            total_seconds % 60,
+        )
         await ctx.send(
             f"{ctx.author.mention}, timer set for {hours}h {minutes}m {seconds}s! Description: {description}"
         )
+        await self.run_timer(timer_id)
+        await self.handle_timer_expiry(ctx, timer_id)
 
-        while self.active_timers.get(timer_id):
-            if total_seconds <= 0:
-                break
-            await asyncio.sleep(1)
-            total_seconds -= 1
-            self.active_timers[timer_id]["remaining_time"] = total_seconds
-
+    @timer.command(name="stop")
+    async def stop_timer(self, ctx, timer_id: int):
+        """Stop a specific timer by its ID."""
         if timer_id in self.active_timers:
-            if (
-                ctx.author.voice
-                and ctx.author.voice.channel
-                and not ctx.guild.voice_client
-            ):
-                try:
-                    voice_channel = ctx.author.voice.channel
-                    audio_file = "./sounds/alert.mp3"
-                    sound = AudioSegment.from_file(audio_file)
-                    audio_duration = sound.duration_seconds
+            description = self.active_timers[timer_id]["description"]
+            del self.active_timers[timer_id]
+            await ctx.send(
+                f'Deleted **timer {timer_id}** with the description: "{description}"'
+            )
+        else:
+            await ctx.send(
+                "A timer with this ID doesn't exist. You can check existing timers with `.timer list`."
+            )
 
-                    vc = await voice_channel.connect()
-                    vc.play(discord.FFmpegPCMAudio(audio_file))
+    @timer.command(name="clear")
+    async def clear_timers(self, ctx):
+        """Clear all active timers."""
+        timer_count = len(self.active_timers)
+        self.active_timers.clear()
+        await ctx.send(f"**Cleared all {timer_count} timers.**")
 
-                    await ctx.send(
-                        f"{ctx.author.mention}, time's up! {self.active_timers[timer_id]['description']}"
-                    )
-                    await asyncio.sleep(audio_duration)
-                    await vc.disconnect()
-                except Exception as e:
-                    print(f"An error occurred: {e}")
-            else:
-                await ctx.send(
-                    f"{ctx.author.mention}, time's up! {self.active_timers[timer_id]['description']}"
-                )
+    @timer.command(name="extend")
+    async def extend_timer(self, ctx, timer_id: int, time_str: str):
+        """Extend an existing timer by a specific duration."""
+        total_seconds = await self.parse_time(ctx, time_str)
+        if total_seconds is None:
+            await ctx.send("Invalid time provided for extending.")
+            return
 
-            del self.active_timers[timer_id]  # Remove the timer after it has finished
+        if timer_id not in self.active_timers:
+            await ctx.send("Timer with this ID doesn't exist.")
+            return
 
-    @commands.command(name="timers")
-    async def timers(self, ctx):
+        self.active_timers[timer_id]["remaining_time"] += total_seconds
+        hours, minutes, seconds = (
+            total_seconds // 3600,
+            (total_seconds % 3600) // 60,
+            total_seconds % 60,
+        )
+        await ctx.send(f"Extended timer {timer_id} by {hours}h {minutes}m {seconds}s.")
+
+    @timer.command(name="list")
+    async def list_timers(self, ctx):
         """List all active timers."""
         if not self.active_timers:
             await ctx.send("No active timers.")
@@ -156,6 +155,76 @@ class Utility(commands.Cog, name="Utility"):
             )
 
         await ctx.send("\n".join(timer_list))
+
+    async def handle_timer_expiry(self, ctx, timer_id):
+        """Handles actions when a timer expires."""
+        if timer_id not in self.active_timers:
+            return
+
+        try:
+            if (
+                ctx.author.voice
+                and ctx.author.voice.channel
+                and not ctx.guild.voice_client
+            ):
+                voice_channel = ctx.author.voice.channel
+                audio_file = "./sounds/alert.mp3"
+
+                sound = AudioSegment.from_file(audio_file)
+                audio_duration = sound.duration_seconds
+
+                vc = await voice_channel.connect()
+                vc.play(discord.FFmpegPCMAudio(audio_file))
+
+                await ctx.send(
+                    f"{ctx.author.mention}, time's up! {self.active_timers[timer_id]['description']}"
+                )
+                await asyncio.sleep(audio_duration)
+                await vc.disconnect()
+            else:
+                await ctx.send(
+                    f"{ctx.author.mention}, time's up! {self.active_timers[timer_id]['description']}"
+                )
+        except Exception as e:
+            print(f"An error occurred while handling timer expiry: {e}")
+
+        del self.active_timers[timer_id]
+
+    async def run_timer(self, timer_id):
+        while self.active_timers.get(timer_id):
+            remaining_time = self.active_timers[timer_id]["remaining_time"]
+            if remaining_time <= 0:
+                break
+            await asyncio.sleep(1)
+            self.active_timers[timer_id]["remaining_time"] -= 1
+
+    async def parse_time(self, ctx, time_str: str) -> int | None:
+        """Parse a time string in 'hh:mm:ss', 'mm:ss', or 'ss' format to total seconds."""
+        try:
+            # Split time_str by colons to identify hh:mm:ss or mm:ss formats
+            time_parts = list(map(int, time_str.split(":")))
+
+            if len(time_parts) == 3:  # hh:mm:ss
+                hours, minutes, seconds = time_parts
+            elif len(time_parts) == 2:  # mm:ss
+                hours, minutes, seconds = 0, *time_parts
+            elif len(time_parts) == 1:  # ss
+                hours, minutes, seconds = 0, 0, time_parts[0]
+            else:
+                await ctx.send(
+                    "Please provide time in 'hh:mm:ss', 'mm:ss', or 'ss' format."
+                )
+                return None
+
+            # Calculate total seconds
+            total_seconds = hours * 3600 + minutes * 60 + seconds
+            return total_seconds if total_seconds > 0 else None
+
+        except ValueError:
+            await ctx.send(
+                "Invalid time format. Please use numbers only in 'hh:mm:ss', 'mm:ss', or 'ss' format."
+            )
+            return None
 
     @commands.command(name="play")
     async def play(self, ctx):

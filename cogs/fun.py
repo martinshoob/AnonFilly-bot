@@ -107,7 +107,7 @@ class Fun(commands.Cog, name="Fun"):
         if "explicit" in correct_tags:
             await ctx.send("Caution! Explicit image.")
             # Using the "everything filter", might need to change that later - it can be wild.
-            await ctx.send(self.fetch_random_derpibooru_image(correct_tags, "56027"))
+            await ctx.send(self.fetch_random_derpibooru_image(correct_tags, "219006"))
         else:
             await ctx.send(self.fetch_random_derpibooru_image(correct_tags))
 
