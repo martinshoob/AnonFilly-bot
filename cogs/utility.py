@@ -69,7 +69,23 @@ class Utility(commands.Cog, name="Utility"):
         self, ctx, words: str, *, description: str = "No description provided."
     ):
         """Set a timer for hh:mm:ss or ss with an optional description."""
-        await ctx.message.delete()
+        if words == "stop":
+            await self.stop_timer(ctx, description)
+            return
+
+        if words == "clear":
+            timer_amount = len(self.active_timers)
+            for i in range(1, timer_amount+1):
+                print(i)
+                print(range(len(self.active_timers)))
+                await self.stop_timer(ctx, i)
+            await ctx.send("**Cleared all timers.**")
+            return
+
+        if words == "extend":
+            await self.extend_timer(ctx, description)
+            return
+            
         split_words = words.split(":")
         hours, minutes, seconds = 0, 0, 0
         if len(split_words) == 3:
@@ -138,6 +154,67 @@ class Utility(commands.Cog, name="Utility"):
                 )
 
             del self.active_timers[timer_id]  # Remove the timer after it has finished
+
+    async def stop_timer(self, ctx, id)->None:
+        try:
+            delete_id = int(id)
+            # await ctx.send(delete_id)
+        except ValueError:
+            await ctx.send("Wrong format. Did you write a number (Timer ID)?")
+            return
+
+        try:
+            await ctx.send(f"Deleted **timer {delete_id}** with the description: \"{self.active_timers[delete_id]["description"]}\"")
+            del self.active_timers[delete_id]
+            return
+        except ValueError:
+            await ctx.send("A timer with this ID doesn't exist. You can check existing timers with '.timers'.")
+            return
+
+    async def extend_timer(self, ctx, amount):
+        split_id_amount = amount.split(" ")
+        split_words_tmp = split_id_amount.split(":")
+        split_words = split_words_tmp[1]
+        id = split_id_amount[0]
+        print(split_words)
+        hours, minutes, seconds = 0, 0, 0
+        if len(split_words) == 3:
+            try:
+                hours = int(split_words[0])
+                minutes = int(split_words[1])
+                seconds = int(split_words[2])
+            except ValueError:
+                await ctx.send("Wrong format, did you forget to write numbers?")
+                return
+        else:
+            try:
+                seconds = int(split_id_amount[1])
+            except ValueError:
+                await ctx.send("Wrong format, please write hh:mm:ss or ss.")
+                return
+
+        total_seconds = hours * 3600 + minutes * 60 + seconds
+        if total_seconds <= 0:
+            await ctx.send("Please set a positive duration for the timer.")
+            return
+
+        try:
+            id = int(id)
+        except ValueError:
+            await ctx.send("Incorrect ID, did you use a number?")
+            return
+
+        try:
+            self.active_timers[id]["remaining_time"] += total_seconds
+            await ctx.send(f"Extended timer {id} by {hours}h {minutes}m {seconds}s.")
+        except ValueError:
+            await ctx.send("Timer with this ID doesn't exist.")
+            return
+
+
+
+        
+
 
     @commands.command(name="timers")
     async def timers(self, ctx):
